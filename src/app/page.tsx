@@ -119,11 +119,11 @@ export default function Home() {
       </div>
 
       <Script
-        src={`${assetBase}/yolo11-arch/versions.js?v=20260703n`}
+        src={`${assetBase}/yolo11-arch/versions.js?v=20260706a`}
         strategy="afterInteractive"
       />
       <Script
-        src={`${assetBase}/yolo11-arch/app.js?v=20260703n`}
+        src={`${assetBase}/yolo11-arch/app.js?v=20260706a`}
         strategy="afterInteractive"
       />
     </>

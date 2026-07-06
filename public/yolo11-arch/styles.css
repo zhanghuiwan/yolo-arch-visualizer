@@ -235,14 +235,16 @@ input:focus-visible,
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  grid-template-columns: minmax(170px, 1.2fr) minmax(130px, 0.9fr) minmax(116px, 0.76fr) minmax(128px, 0.8fr) minmax(136px, 0.92fr) minmax(118px, 0.74fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .metric {
-  min-height: 82px;
-  padding: 14px 16px;
+  min-height: 58px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -251,16 +253,20 @@ input:focus-visible,
 .metric span {
   display: block;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.74rem;
   font-weight: 650;
+  white-space: nowrap;
 }
 
 .metric strong {
   display: block;
-  margin-top: 5px;
+  margin-top: 3px;
   color: var(--ink);
-  font-size: 1.18rem;
-  line-height: 1.2;
+  font-size: 0.98rem;
+  line-height: 1.16;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace {
@@ -1034,10 +1040,6 @@ input:focus-visible,
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: 1fr;
-  }
-
-  .summary-strip {
-    grid-template-columns: repeat(3, minmax(140px, 1fr));
   }
 }
 

@@ -511,13 +511,11 @@ function renderSummary() {
   const selected = layers.find((layer) => layer.id === state.selectedId) || layers[2];
   const metrics = [
     ["当前版本", version.fullName],
+    ["选中模块", `L${selected.id} ${selected.module}`],
     ["当前规模", `${version.name}${state.modelKey}`],
     ["depth × width", `${model.depth} × ${model.width}`],
-    ["max channels", model.maxChannels],
     ["parameters", model.params],
     ["GFLOPs @640", model.gflops],
-    ["reg_max / end2end", `${version.regMax}${version.end2end ? " / True" : " / False"}`],
-    ["选中模块", `L${selected.id} ${selected.module}`],
   ];
 
   summaryStrip.innerHTML = metrics
