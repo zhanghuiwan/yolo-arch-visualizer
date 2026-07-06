@@ -248,6 +248,7 @@ input:focus-visible,
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+  text-align: center;
 }
 
 .metric span {
