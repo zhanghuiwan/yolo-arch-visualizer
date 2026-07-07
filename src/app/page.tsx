@@ -23,21 +23,9 @@ export default function Home() {
             <h1>YOLO 网络结构动态图解</h1>
           </div>
 
-          <div className="control-cluster" aria-label="版本、规模与缩放控制">
+          <div className="control-cluster" aria-label="版本与模型规模控制">
             <div className="version-switch" id="versionSwitch" aria-label="选择 YOLO 版本"></div>
             <div className="model-switch" id="modelSwitch" aria-label="选择模型规模"></div>
-            <div className="zoom-tools" aria-label="缩放画布">
-              <button className="icon-button" id="zoomOut" type="button" title="缩小" aria-label="缩小">−</button>
-              <input id="zoomRange" type="range" min="45" max="220" defaultValue={70} aria-label="缩放比例" />
-              <button className="icon-button" id="zoomIn" type="button" title="放大" aria-label="放大">+</button>
-              <div className="zoom-presets" id="zoomPresets" aria-label="缩放预设">
-                <button className="preset-button" type="button" data-zoom="0.6">60%</button>
-                <button className="preset-button" type="button" data-zoom="1">100%</button>
-                <button className="preset-button" type="button" data-zoom="1.6">160%</button>
-                <button className="preset-button" id="zoomFit" type="button">适屏</button>
-              </div>
-              <button className="icon-button" id="zoomReset" type="button" title="重置视图 (按 0 键)" aria-label="重置视图">↺</button>
-            </div>
           </div>
         </header>
 
@@ -56,6 +44,18 @@ export default function Home() {
                   <span><i className="legend-stack" aria-hidden="true"></i>×N 模块重复堆叠</span>
                 </div>
                 <div className="toolbar-actions">
+                  <div className="zoom-tools" aria-label="缩放画布">
+                    <button className="icon-button" id="zoomOut" type="button" title="缩小" aria-label="缩小">−</button>
+                    <input id="zoomRange" type="range" min="45" max="220" defaultValue={70} aria-label="缩放比例" />
+                    <button className="icon-button" id="zoomIn" type="button" title="放大" aria-label="放大">+</button>
+                    <div className="zoom-presets" id="zoomPresets" aria-label="缩放预设">
+                      <button className="preset-button" type="button" data-zoom="0.6">60%</button>
+                      <button className="preset-button" type="button" data-zoom="1">100%</button>
+                      <button className="preset-button" type="button" data-zoom="1.6">160%</button>
+                      <button className="preset-button" id="zoomFit" type="button">适屏</button>
+                    </div>
+                    <button className="icon-button" id="zoomReset" type="button" title="重置视图 (按 0 键)" aria-label="重置视图">↺</button>
+                  </div>
                   <button id="compareTrigger" className="reference-trigger" type="button" aria-label="打开版本对比：v5 → v8 → v11 → v26 演进表">
                     <span aria-hidden="true">↔</span> 版本对比
                   </button>
@@ -72,8 +72,11 @@ export default function Home() {
 
             <aside className="detail-panel" aria-live="polite">
               <div className="detail-head">
-                <p className="panel-kicker" id="detailSection">模块详情</p>
-                <h2 id="detailTitle">点击图中的模块</h2>
+                <div className="detail-title-area">
+                  <p className="panel-kicker" id="detailSection">模块详情</p>
+                  <h2 id="detailTitle">点击图中的模块</h2>
+                </div>
+                <button className="detail-close" type="button" aria-label="关闭模块详情" title="关闭模块详情">×</button>
               </div>
               <div id="detailBody" className="detail-body"></div>
             </aside>

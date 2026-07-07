@@ -2136,6 +2136,7 @@ function bindCanvasPan() {
     // 点击在节点上、子卡片上、抽屉里都不触发 pan
     if (event.target.closest?.(".node-hit")) return;
     if (event.target.closest?.(".unit-card")) return;
+    if (event.target.closest?.(".zoom-tools")) return;
     panState = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -2174,6 +2175,14 @@ function bindCanvasPan() {
 }
 
 function bindDrawer() {
+  const detailClose = detailPanel.querySelector(".detail-close");
+  if (detailClose) {
+    detailClose.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeDetailDrawer();
+    });
+  }
+
   // 点击画布空白处（非节点、非子卡片）：如果发生了拖动则忽略，否则关闭抽屉
   diagram.addEventListener("click", (event) => {
     if (suppressCanvasClick) {
@@ -2208,6 +2217,39 @@ function bindDrawer() {
 
 // ====== 子模块说明已迁移到右侧抽屉（栈式导航）======
 // 原 popover 浮窗机制已删除：点击小卡片直接 push 到 detailStack，在抽屉中显示信息。
+
+let referenceReturnFocus = null;
+let compareReturnFocus = null;
+
+function modalFocusableElements(modal) {
+  return [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => !el.disabled && el.getAttribute("aria-hidden") !== "true");
+}
+
+function focusModal(modal) {
+  window.requestAnimationFrame(() => {
+    const target = modal.querySelector(".reference-close") || modalFocusableElements(modal)[0];
+    if (target) target.focus({ preventScroll: true });
+  });
+}
+
+function trapModalFocus(event, modal) {
+  if (event.key !== "Tab" || !modal.classList.contains("is-open")) return;
+  const focusables = modalFocusableElements(modal);
+  if (!focusables.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 // ====== 知识库 modal（YAML 计算方式 + 固定解释） ======
 const referenceModal = () => document.querySelector("#referenceModal");
@@ -2307,19 +2349,27 @@ function renderReferenceModal() {
   `;
 }
 
-function openReferenceModal() {
+function openReferenceModal(trigger = document.querySelector("#referenceTrigger")) {
   const modal = referenceModal();
   if (!modal) return;
+  referenceReturnFocus = trigger || document.activeElement;
   renderReferenceModal();
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
+  modal.setAttribute("aria-modal", "true");
+  focusModal(modal);
 }
 
-function closeReferenceModal() {
+function closeReferenceModal({ restoreFocus = true } = {}) {
   const modal = referenceModal();
   if (!modal) return;
+  const wasOpen = modal.classList.contains("is-open");
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
+  modal.removeAttribute("aria-modal");
+  if (wasOpen && restoreFocus && referenceReturnFocus) {
+    referenceReturnFocus.focus({ preventScroll: true });
+  }
 }
 
 function bindReferenceModal() {
@@ -2329,8 +2379,9 @@ function bindReferenceModal() {
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
     if (modal.classList.contains("is-open")) closeReferenceModal();
-    else openReferenceModal();
+    else openReferenceModal(trigger);
   });
+  modal.addEventListener("keydown", (event) => trapModalFocus(event, modal));
   modal.addEventListener("click", (event) => {
     if (event.target === modal) closeReferenceModal();
   });
@@ -2411,19 +2462,27 @@ function renderCompareModal() {
   `;
 }
 
-function openCompareModal() {
+function openCompareModal(trigger = document.querySelector("#compareTrigger")) {
   const modal = compareModal();
   if (!modal) return;
+  compareReturnFocus = trigger || document.activeElement;
   renderCompareModal();
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
+  modal.setAttribute("aria-modal", "true");
+  focusModal(modal);
 }
 
-function closeCompareModal() {
+function closeCompareModal({ restoreFocus = true } = {}) {
   const modal = compareModal();
   if (!modal) return;
+  const wasOpen = modal.classList.contains("is-open");
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
+  modal.removeAttribute("aria-modal");
+  if (wasOpen && restoreFocus && compareReturnFocus) {
+    compareReturnFocus.focus({ preventScroll: true });
+  }
 }
 
 function bindCompareModal() {
@@ -2433,8 +2492,9 @@ function bindCompareModal() {
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
     if (modal.classList.contains("is-open")) closeCompareModal();
-    else openCompareModal();
+    else openCompareModal(trigger);
   });
+  modal.addEventListener("keydown", (event) => trapModalFocus(event, modal));
   modal.addEventListener("click", (event) => {
     if (event.target === modal) closeCompareModal();
   });
@@ -2481,8 +2541,7 @@ bindReferenceModal();
 bindCompareModal();
 bindVersionSwitch();
 render();
-// 初始加载时不自动适屏：保留固定 zoom 让画布有滚动空间，抓手拖动才能工作
-// 用户可点击「适屏」按钮主动适配视口
+window.requestAnimationFrame(() => fitDiagram());
 // 窗口大小变化时仅刷新缩放显示，不强制适屏（避免破坏用户已设定的缩放与位置）
 let resizeTimer;
 window.addEventListener("resize", () => {

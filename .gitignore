@@ -6,6 +6,7 @@ dist/
 build/
 .agents/
 skills-lock.json
+PRODUCT.md
 *.log
 *.zip
 .env*
