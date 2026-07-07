@@ -110,7 +110,8 @@ h1 {
   min-width: 0;
 }
 
-.model-switch {
+.model-switch,
+.language-switch {
   display: inline-flex;
   gap: 4px;
   padding: 4px;
@@ -129,6 +130,7 @@ h1 {
 }
 
 .model-button,
+.language-button,
 .icon-button,
 .preset-button,
 .version-button {
@@ -139,12 +141,18 @@ h1 {
   cursor: pointer;
 }
 
-.model-button {
+.model-button,
+.language-button {
   min-width: 44px;
   min-height: 38px;
   padding: 7px 12px;
   font-size: 0.95rem;
   font-weight: 750;
+}
+
+.language-button {
+  min-width: 58px;
+  color: var(--muted);
 }
 
 .version-button {
@@ -171,13 +179,15 @@ h1 {
 }
 
 .model-button:hover,
+.language-button:hover,
 .icon-button:hover,
 .preset-button:hover,
 .version-button:hover {
   background: var(--primary-wash);
 }
 
-.model-button.active {
+.model-button.active,
+.language-button.active {
   background: var(--primary);
   color: var(--bg);
 }
@@ -1117,6 +1127,7 @@ input:focus-visible,
     justify-content: flex-start;
   }
 
+  .language-switch,
   .version-switch,
   .model-switch {
     width: 100%;
@@ -1124,6 +1135,7 @@ input:focus-visible,
     scrollbar-width: none;
   }
 
+  .language-switch::-webkit-scrollbar,
   .version-switch::-webkit-scrollbar,
   .model-switch::-webkit-scrollbar,
   .summary-strip::-webkit-scrollbar,
@@ -1136,7 +1148,8 @@ input:focus-visible,
     padding: 6px 9px;
   }
 
-  .model-button {
+  .model-button,
+  .language-button {
     flex: 1 1 0;
     min-width: 0;
     padding-inline: 8px;

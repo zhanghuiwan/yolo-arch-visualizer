@@ -11,6 +11,108 @@ const EXPANDED_DETECT = SHARED.EXPANDED_DETECT;
 const DETECT_NODE = SHARED.DETECT_NODE;
 const COLORS = SHARED.COLORS;
 const PARAM_GLOSSARY = SHARED.PARAM_GLOSSARY;
+const I18N_TEXT = SHARED.I18N_TEXT || {};
+const DATA_TRANSLATIONS = SHARED.DATA_TRANSLATIONS || {};
+const LANG_STORAGE_KEY = "yolo-arch-lang";
+
+function getInitialLang() {
+  try {
+    const saved = window.localStorage.getItem(LANG_STORAGE_KEY);
+    return saved === "en" ? "en" : "zh";
+  } catch {
+    return "zh";
+  }
+}
+
+function i18nEntry(key) {
+  return key.split(".").reduce((obj, part) => (obj && obj[part] !== undefined ? obj[part] : undefined), I18N_TEXT);
+}
+
+function interpolate(template, vars = {}) {
+  return String(template).replace(/\{(\w+)\}/g, (_, name) => (vars[name] !== undefined ? vars[name] : `{${name}}`));
+}
+
+function translateFallback(value) {
+  let output = DATA_TRANSLATIONS[value] || value;
+  if (output !== value || !/[\u2e80-\u9fff]/.test(output)) return output;
+
+  const fragments = [
+    ["输入通道", "Input channels"],
+    ["输出通道", "Output channels"],
+    ["输出维度", "Output dimension"],
+    ["重复次数", "Repeats"],
+    ["空间尺寸", "Spatial size"],
+    ["实际", "actual"],
+    ["输入", "input"],
+    ["输出", "output"],
+    ["通道", "channels"],
+    ["卷积核大小", "kernel size"],
+    ["卷积步长", "stride"],
+    ["边缘补零", "padding"],
+    ["下采样", "downsampling"],
+    ["特征融合", "feature fusion"],
+    ["语义融合", "semantic fusion"],
+    ["大目标", "large objects"],
+    ["中目标", "medium objects"],
+    ["小目标", "small objects"],
+    ["残差连接", "residual connection"],
+    ["残差相加", "residual add"],
+    ["主路", "main path"],
+    ["旁路", "bypass"],
+    ["保留", "kept"],
+    ["无参数", "no parameters"],
+    ["推理无需 NMS", "NMS-free inference"],
+    ["传统 NMS 流程", "traditional NMS path"],
+    ["离散分布", "discrete distribution"],
+    ["直接回归", "direct regression"],
+    ["拼接", "concat"],
+    ["检测输出", "detection output"],
+    ["检测输入", "detection input"],
+    ["连续池化扩大感受野", "Chained pooling expands receptive field"],
+    ["YOLO26 新增残差连接", "YOLO26 adds a residual connection"],
+    ["新增残差连接", "adds a residual connection"],
+    ["一路保留，一路进入内部块", "One branch is kept; one enters inner blocks"],
+    ["一路保留，一路串接 n 个 Bottleneck", "One branch is kept; one chains n Bottleneck blocks"],
+    ["每个 C3k 内含 C3-style 结构和 2 个 Bottleneck(k=3)", "Each C3k contains a C3-style structure and two Bottleneck(k=3) blocks"],
+    ["每个 Bottleneck 由两层 k=3 Conv 组成，串接输出", "Each Bottleneck has two k=3 Conv layers, with chained outputs"],
+    ["每个 Bottleneck 由两层 k=3 Conv 组成", "Each Bottleneck has two k=3 Conv layers"],
+    ["每个 Bottleneck：k=1 + k=3，可选 shortcut", "Each Bottleneck: k=1 + k=3, optional shortcut"],
+    ["主路 + 旁路", "main path + bypass"],
+    ["来源", "source"],
+    ["串接", "chained"],
+    ["尺度", "scale"],
+    ["生成", "produce"],
+    ["来自", "from"],
+    ["无", "None"],
+    ["有", "Yes"],
+  ];
+
+  fragments.sort((a, b) => b[0].length - a[0].length).forEach(([zh, en]) => {
+    output = output.replaceAll(zh, en);
+  });
+  return output;
+}
+
+function pickLang(value) {
+  if (Array.isArray(value)) return value.map((item) => pickLang(item));
+  if (value && typeof value === "object") {
+    if (!("zh" in value) && !("en" in value)) return value;
+    const picked = state.lang === "en" ? value.en ?? value.zh : value.zh ?? value.en;
+    return pickLang(picked ?? "");
+  }
+  if (state.lang !== "en" || typeof value !== "string") return value;
+  return translateFallback(value);
+}
+
+function t(key, vars = {}) {
+  const entry = i18nEntry(key);
+  const value = entry === undefined ? key : pickLang(entry);
+  return interpolate(value, vars);
+}
+
+function htmlLang() {
+  return state.lang === "en" ? "en" : "zh-CN";
+}
 
 // 当前版本/规模的快捷访问
 function currentVersion() {
@@ -58,6 +160,7 @@ function getLayerDefs() {
 // 兼容旧引用：直接调用 currentXxx() 获取当前版本/规模下的值
 
 let state = {
+  lang: getInitialLang(),
   versionKey: "v11",
   modelKey: "n",
   zoom: 0.7,
@@ -79,6 +182,7 @@ let panState = null;
 let suppressCanvasClick = false;
 
 const modelSwitch = document.querySelector("#modelSwitch");
+const languageSwitch = document.querySelector("#languageSwitch");
 const summaryStrip = document.querySelector("#summaryStrip");
 const diagram = document.querySelector("#diagram");
 const detailSection = document.querySelector("#detailSection");
@@ -457,6 +561,52 @@ function nodeMetaLine(layer) {
   return subtitle ? `${subtitle} · ${channels}` : channels;
 }
 
+function renderStaticText() {
+  document.documentElement.lang = htmlLang();
+  document.title = t("meta.title");
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+    element.setAttribute("title", t(element.dataset.i18nTitle));
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAria));
+  });
+}
+
+function setLanguage(lang) {
+  if (!["zh", "en"].includes(lang) || state.lang === lang) return;
+  state.lang = lang;
+  try {
+    window.localStorage.setItem(LANG_STORAGE_KEY, lang);
+  } catch {
+    // Ignore storage failures; the in-memory language still updates.
+  }
+  render();
+}
+
+function renderLanguageSwitch() {
+  if (!languageSwitch) return;
+  languageSwitch.innerHTML = "";
+  [
+    ["zh", t("language.zh"), t("language.zhAria")],
+    ["en", t("language.en"), t("language.enAria")],
+  ].forEach(([lang, label, aria]) => {
+    const button = document.createElement("button");
+    button.className = `language-button${lang === state.lang ? " active" : ""}`;
+    button.type = "button";
+    button.textContent = label;
+    button.setAttribute("aria-label", aria);
+    button.setAttribute("aria-pressed", String(lang === state.lang));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setLanguage(lang);
+    });
+    languageSwitch.appendChild(button);
+  });
+}
+
 function renderModelSwitch() {
   modelSwitch.innerHTML = "";
   const scales = currentScales();
@@ -466,7 +616,7 @@ function renderModelSwitch() {
     button.type = "button";
     button.textContent = key;
     button.title = `${currentVersion().name}${key} · ${model.params} params · ${model.gflops} GFLOPs`;
-    button.setAttribute("aria-label", `选择 ${currentVersion().name}${key}`);
+    button.setAttribute("aria-label", state.lang === "en" ? `Choose ${currentVersion().name}${key}` : `选择 ${currentVersion().name}${key}`);
     button.addEventListener("click", () => {
       state.modelKey = key;
       state.expandedId = null;
@@ -490,7 +640,7 @@ function renderVersionSwitch() {
     button.type = "button";
     button.innerHTML = `<span class="version-label">${v.name}</span><span class="version-year">${v.year}</span>`;
     button.title = `${v.fullName} · reg_max=${v.regMax}${v.end2end ? " · end2end" : ""}`;
-    button.setAttribute("aria-label", `切换到 ${v.fullName}`);
+    button.setAttribute("aria-label", state.lang === "en" ? `Switch to ${v.fullName}` : `切换到 ${v.fullName}`);
     button.addEventListener("click", () => {
       if (state.versionKey === v.key) return;
       state.versionKey = v.key;
@@ -510,9 +660,9 @@ function renderSummary() {
   const layers = resolveLayers(state.modelKey);
   const selected = layers.find((layer) => layer.id === state.selectedId) || layers[2];
   const metrics = [
-    ["当前版本", version.fullName],
-    ["选中模块", `L${selected.id} ${selected.module}`],
-    ["当前规模", `${version.name}${state.modelKey}`],
+    [t("summary.version"), version.fullName],
+    [t("summary.selected"), `L${selected.id} ${selected.module}`],
+    [t("summary.scale"), `${version.name}${state.modelKey}`],
     ["depth × width", `${model.depth} × ${model.width}`],
     ["parameters", model.params],
     ["GFLOPs @640", model.gflops],
@@ -563,7 +713,7 @@ function drawPanelLabels(svg, layers, canvasHeight) {
   addText(svg, "Detect", 1310, 80, { fill: "oklch(0.390 0.090 82)", "font-size": 26, "font-weight": 880 });
 
   const inputX = getNodePos(0)[0] + NODE.width / 2;
-  addText(svg, ["输入", `${currentInputSize()}×${currentInputSize()}×3`], inputX, 106, {
+  addText(svg, [t("diagram.input"), `${currentInputSize()}×${currentInputSize()}×3`], inputX, 106, {
     fill: COLORS.muted,
     "font-size": 14.4,
     "font-weight": 720,
@@ -583,18 +733,20 @@ function drawBasicUnitCard(parent, x, y, width, height, title, color, lines, cli
   // 用一个 <g class="unit-card"> 包裹整张卡片，让小卡片本身可点击查看说明
   const card = svgEl("g", { class: "unit-card" });
   const hasInfo = stepData && stepData.info;
+  const displayTitle = pickLang(title);
+  const displayLines = pickLang(lines);
   if (hasInfo) {
     card.classList.add("is-clickable");
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-label", `查看 ${title} 的说明`);
+    card.setAttribute("aria-label", t("diagram.unitAria", { title: displayTitle }));
   }
 
   const headerHeight = height < 56 ? 26 : 32;
   const fontSize = height < 58 ? 11 : 12.4;
   const lineGap = height < 58 ? 13.5 : 15.6;
   const maxBodyLines = Math.max(1, Math.floor((height - headerHeight - 26) / lineGap) + 1);
-  const fittedLines = fitTextLines(lines, width - 24, fontSize, maxBodyLines);
+  const fittedLines = fitTextLines(displayLines, width - 24, fontSize, maxBodyLines);
   addBox(card, x, y, width, height, "oklch(0.997 0 0)", "oklch(0.514 0.030 165)", 8);
   const clip = svgEl("clipPath", { id: clipId });
   clip.appendChild(svgEl("rect", { x, y, width, height: headerHeight, rx: 8 }));
@@ -603,7 +755,7 @@ function drawBasicUnitCard(parent, x, y, width, height, title, color, lines, cli
   bodyClip.appendChild(svgEl("rect", { x: x + 1, y: y + headerHeight, width: width - 2, height: height - headerHeight - 2 }));
   card.appendChild(bodyClip);
   card.appendChild(svgEl("rect", { x, y, width, height: headerHeight, fill: color, "clip-path": `url(#${clipId})` }));
-  addText(card, trimToUnits(title, maxTextUnits(width - 22, 14.4)), x + 12, y + (headerHeight === 26 ? 19 : 22), {
+  addText(card, trimToUnits(displayTitle, maxTextUnits(width - 22, 14.4)), x + 12, y + (headerHeight === 26 ? 19 : 22), {
     fill: "oklch(0.990 0.002 160)",
     "font-size": 14.4,
     "font-weight": 830,
@@ -655,7 +807,7 @@ function drawExpandedModuleNode(svg, layer, layers) {
     class: "node-hit is-selected is-expanded",
     tabindex: "0",
     role: "button",
-    "aria-label": `收起 Layer ${layer.id} ${layer.module} 的展开结构`,
+    "aria-label": t("diagram.collapseExpanded", { id: layer.id, module: layer.module }),
   });
   group.dataset.id = layer.id;
 
@@ -672,7 +824,7 @@ function drawExpandedModuleNode(svg, layer, layers) {
   addBox(group, x, y, width, height, "oklch(0.995 0.002 160)", COLORS.selected, 8, {
     "stroke-width": 2.6,
   });
-  addText(group, `Layer ${layer.id} ${layer.module} 展开`, x + 16, y + 26, {
+  addText(group, state.lang === "en" ? `Layer ${layer.id} ${layer.module} expanded` : `Layer ${layer.id} ${layer.module} 展开`, x + 16, y + 26, {
     fill: COLORS.title,
     "font-size": 15.4,
     "font-weight": 870,
@@ -695,7 +847,7 @@ function drawExpandedModuleNode(svg, layer, layers) {
       cardHeight,
       item.title,
       unitColor(item.kind),
-      item.lines,
+      pickLang(item.lines),
       `unit-clip-${layer.id}-${index}`,
       item,
       layer.id,
@@ -740,7 +892,11 @@ function drawLayerNode(svg, layer) {
     class: `node-hit${layer.id === state.selectedId ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`,
     tabindex: "0",
     role: "button",
-    "aria-label": `${layer.module === "Conv" ? (isExpanded ? "收起" : "展开") : "查看"} Layer ${layer.id} ${layer.module} 的结构和参数`,
+    "aria-label": t("diagram.nodeAria", {
+      action: layer.module === "Conv" ? (isExpanded ? t("diagram.actionCollapse") : t("diagram.actionExpand")) : t("diagram.actionView"),
+      id: layer.id,
+      module: layer.module,
+    }),
   });
   group.dataset.id = layer.id;
 
@@ -823,7 +979,7 @@ function drawLayerNode(svg, layer) {
   }
 
   if (isExpanded) {
-    addText(group, "已展开", layer.x + NODE.width - 28, layer.y + 78, {
+    addText(group, t("diagram.expanded"), layer.x + NODE.width - 28, layer.y + 78, {
       fill: COLORS.selected,
       "font-size": 12,
       "font-weight": 850,
@@ -858,7 +1014,10 @@ function drawDetectNode(svg, detectLayer, target) {
     class: `node-hit${detectLayer.id === state.selectedId ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`,
     tabindex: "0",
     role: "button",
-    "aria-label": `${isExpanded ? "收起" : "展开"} ${target.label} Detect 检测头参数`,
+    "aria-label": t("diagram.detectAria", {
+      action: isExpanded ? t("diagram.actionCollapse") : t("diagram.actionExpand"),
+      label: target.label,
+    }),
   });
   group.dataset.id = detectLayer.id;
 
@@ -868,7 +1027,7 @@ function drawDetectNode(svg, detectLayer, target) {
   if (isExpanded) {
     const branch = detectBranchChannels(resolveLayers(state.modelKey));
     const sourceLayer = resolveLayers(state.modelKey)[target.source];
-    addText(group, `${target.label} Detect 展开`, pseudo.x + 14, pseudo.y + 24, { fill: COLORS.ink, "font-size": 14, "font-weight": 850 });
+    addText(group, state.lang === "en" ? `${target.label} Detect expanded` : `${target.label} Detect 展开`, pseudo.x + 14, pseudo.y + 24, { fill: COLORS.ink, "font-size": 14, "font-weight": 850 });
     addText(group, `in ${batchShape(sourceLayer.outShape)}`, pseudo.x + 14, pseudo.y + 48, { fill: COLORS.ink, "font-size": 12, "font-weight": 720 });
     drawBasicUnitCard(group, pseudo.x + 14, pseudo.y + 62, pseudo.width - 28, 52, "Box branch", unitColor("detect"), [
       `${sourceLayer.channels} → ${branch.box} → ${branch.regMax * 4}`,
@@ -1467,10 +1626,10 @@ function renderFlowSteps(steps) {
             <div class="flow-step ${item.kind}">
               <div class="flow-title">
                 <span>${index + 1}</span>
-                <strong>${escapeHtml(item.title)}</strong>
+                <strong>${escapeHtml(pickLang(item.title))}</strong>
               </div>
               <ul>
-                ${item.lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
+                ${pickLang(item.lines).map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
               </ul>
             </div>
             ${index < steps.length - 1 ? '<div class="flow-arrow">↓</div>' : ""}
@@ -1490,14 +1649,18 @@ function renderDetectFlow(layers) {
   const version = currentVersion();
   const clsConv = version.legacy ? "Conv k=3 + Conv k=1" : "DWConv k=3 + Conv k=1";
   const noteText = version.end2end
-    ? `YOLO26 启用 end2end 模式：训练时同时学 one2many（一对多，传统 NMS 流程）+ one2one（一对一匹配），推理 fuse() 后只保留 one2one 头，无需 NMS。reg_max=${branch.regMax} 让 DFL 退化为直接回归 ${branch.regMax * 4} 个连续值。`
-    : `Detect 每个位置先得到 ${branch.no} 个 logits：${branch.regMax * 4} 个 box 分布 + ${branch.nc} 个类别分数。推理时 DFL 把 box 分布转成 4 个连续边框偏移，再结合网格点和 stride 解码。`;
+    ? (state.lang === "en"
+      ? `YOLO26 enables end2end mode: training learns one2many (traditional NMS path) plus one2one matching. After fuse(), inference keeps only the one2one head and does not need NMS. reg_max=${branch.regMax} makes DFL degenerate to direct regression of ${branch.regMax * 4} continuous values.`
+      : `YOLO26 启用 end2end 模式：训练时同时学 one2many（一对多，传统 NMS 流程）+ one2one（一对一匹配），推理 fuse() 后只保留 one2one 头，无需 NMS。reg_max=${branch.regMax} 让 DFL 退化为直接回归 ${branch.regMax * 4} 个连续值。`)
+    : (state.lang === "en"
+      ? `Detect first produces ${branch.no} logits per location: ${branch.regMax * 4} box distribution channels plus ${branch.nc} class scores. During inference, DFL converts the box distribution into four continuous offsets, then decodes them with grid points and stride.`
+      : `Detect 每个位置先得到 ${branch.no} 个 logits：${branch.regMax * 4} 个 box 分布 + ${branch.nc} 个类别分数。推理时 DFL 把 box 分布转成 4 个连续边框偏移，再结合网格点和 stride 解码。`);
   return `
     <div class="detect-scale-grid">
       ${sources
         .map((source, index) => {
           const size = source.outSize;
-          const label = ["P3 小目标", "P4 中目标", "P5 大目标"][index];
+          const label = state.lang === "en" ? ["P3 small objects", "P4 medium objects", "P5 large objects"][index] : ["P3 小目标", "P4 中目标", "P5 大目标"][index];
           return `
             <article class="detect-scale">
               <h4>${label} · Layer ${source.id}</h4>
@@ -1537,16 +1700,16 @@ function renderModuleFlow(layers, layer) {
 function renderKeyGrid(layer) {
   const values = [
     ["from", formatFrom(layer)],
-    ["输入 shape (HWC)", layer.inputShape],
-    ["输出 shape (HWC)", layer.outShape],
+    [state.lang === "en" ? "Input shape (HWC)" : "输入 shape (HWC)", layer.inputShape],
+    [state.lang === "en" ? "Output shape (HWC)" : "输出 shape (HWC)", layer.outShape],
     ["c_in", layer.inputChannels],
     ["c_out", Array.isArray(layer.channels) ? layer.channels.join(" / ") : layer.channels],
-    ["repeat", `YAML ${layer.repeat} → 实际 ${layer.repeats}`],
+    ["repeat", state.lang === "en" ? `YAML ${layer.repeat} → actual ${layer.repeats}` : `YAML ${layer.repeat} → 实际 ${layer.repeats}`],
   ];
 
   if (layer.module === "C3k2") {
     values.push(["hidden", hiddenChannels(layer)]);
-    values.push(["内部块", layer.c3kEnabled ? `C3k (${layer.c3kSource})` : "Bottleneck"]);
+    values.push([state.lang === "en" ? "inner block" : "内部块", layer.c3kEnabled ? `C3k (${layer.c3kSource})` : "Bottleneck"]);
   }
   if (layer.module === "Detect") {
     const branch = detectBranchChannels(resolveLayers(state.modelKey));
@@ -1574,13 +1737,13 @@ function renderShapeConvention(layer) {
   if (layer.module === "Detect") {
     return `
       <div class="note">
-        主图中 P3/P4/P5 仍按 HWC 理解空间尺度。Detect 是多尺度输出，不是一个单独的 HWC tensor；每个尺度会分别产生 box 分布通道和类别通道，右侧公式区展示 no=nc+4×reg_max 的计算方式。
+        ${escapeHtml(t("shape.detect"))}
       </div>
     `;
   }
   return `
     <div class="note">
-      主结构图统一使用 HWC：height×width×channel，便于从图像尺度理解网络。模块展开中的底层算子使用 PyTorch NCHW：N×channel×height×width，其中 <strong>N</strong> 表示 batch 维度（推理时 N=1，训练时 N 由 DataLoader 决定，是动态的）。例如 ${escapeHtml(layer.outShape)} 对应 ${escapeHtml(batchShape(layer.outShape))}。
+      ${escapeHtml(t("shape.standard", { hwc: layer.outShape, nchw: batchShape(layer.outShape) }))}
     </div>
   `;
 }
@@ -1591,41 +1754,42 @@ function channelValue(value) {
 
 function renderChannelExplanation(layers, layer) {
   const inputSource = (() => {
-    if (layer.id === 0) return "来自输入图片，RGB 三个颜色通道，所以 c_in=3。";
+    if (layer.id === 0) return t("channels.sourceInput");
     if (layer.module === "Concat") {
-      return inputSources(layers, layer)
-        .map((source) => `${source.label} 输出 ${source.layer.channels} 通道`)
-        .join("，") + "，Concat 后按通道相加。";
+      const sources = inputSources(layers, layer)
+        .map((source) => t("channels.sourceItem", { label: source.label, channels: source.layer.channels }))
+        .join(state.lang === "en" ? "; " : "，");
+      return t("channels.sourceConcat", { sources });
     }
-    if (layer.module === "Detect") return "来自 Head 的 P3、P4、P5 三个输出特征，各尺度通道数分别进入独立检测分支。";
-    if (layer.module === "Upsample") return "来自上一层输出，上采样只改变 H/W，不改变通道数。";
-    return "来自上一层输出通道数，作为当前模块的 c_in。";
+    if (layer.module === "Detect") return t("channels.sourceDetect");
+    if (layer.module === "Upsample") return t("channels.sourceUpsample");
+    return t("channels.sourcePrev");
   })();
 
   const outputRule = (() => {
     if (hasScaledOutputChannels(layer)) {
       const base = layer.args[0];
       const model = currentScale();
-      return `YAML 给出基础通道 ${base}，当前 ${currentVersion().name}${state.modelKey} 使用 width=${model.width} 缩放后得到 c_out=${layer.channels}。`;
+      return t("channels.scaledOutput", { base, model: `${currentVersion().name}${state.modelKey}`, width: model.width, channels: layer.channels });
     }
-    if (layer.module === "Concat") return `输出通道等于输入通道求和：${layer.inputChannels} = ${layer.channels}。`;
-    if (layer.module === "Upsample") return `输出通道保持不变：c_out=${layer.channels}。`;
-    if (layer.module === "Detect") return `Detect 不把三路特征合成一个 c_out，每个位置输出 ${currentRegMax() * 4} 个 box 分布通道和 ${currentNc()} 个类别通道。`;
-    return `输出通道为 ${channelValue(layer.channels)}。`;
+    if (layer.module === "Concat") return t("channels.concatOutput", { input: layer.inputChannels, channels: layer.channels });
+    if (layer.module === "Upsample") return t("channels.upsampleOutput", { channels: layer.channels });
+    if (layer.module === "Detect") return t("channels.detectOutput", { box: currentRegMax() * 4, cls: currentNc() });
+    return t("channels.simpleOutput", { channels: channelValue(layer.channels) });
   })();
 
   const convFilter = layer.module === "Conv"
-    ? `<div class="note">对 Conv 来说，输出通道 c_out=${layer.channels} 也就是 filter 组数。当前层每组 filter 的权重形状是 ${layer.channels}×${layer.inputChannels}×${convParams(layer).k}×${convParams(layer).k}，生成 ${layer.channels} 个输出特征通道。</div>`
+    ? `<div class="note">${escapeHtml(t("channels.convFilter", { channels: layer.channels, input: layer.inputChannels, k: convParams(layer).k }))}</div>`
     : "";
 
   return `
     <div class="channel-explain">
       <div>
-        <strong>输入通道 c_in=${escapeHtml(layer.inputChannels)}</strong>
+        <strong>${escapeHtml(t("channels.inputTitle", { value: layer.inputChannels }))}</strong>
         <span>${escapeHtml(inputSource)}</span>
       </div>
       <div>
-        <strong>输出通道 c_out=${escapeHtml(channelValue(layer.channels))}</strong>
+        <strong>${escapeHtml(t("channels.outputTitle", { value: channelValue(layer.channels) }))}</strong>
         <span>${escapeHtml(outputRule)}</span>
       </div>
     </div>
@@ -1642,23 +1806,23 @@ function renderYamlMath(layers, layer) {
     const clipped = Math.min(base, model.maxChannels);
     const raw = clipped * model.width;
     rows.push([
-      "输出通道",
+      t("yaml.outputChannels"),
       `c_out = make_divisible(min(${base}, ${model.maxChannels}) × ${model.width}, 8) = make_divisible(${raw}, 8) = ${layer.channels}`,
     ]);
   } else if (layer.module === "Concat") {
-    rows.push(["输出通道", `c_out = sum(${layer.inputChannels}) = ${layer.channels}`]);
+    rows.push([t("yaml.outputChannels"), `c_out = sum(${layer.inputChannels}) = ${layer.channels}`]);
   } else if (layer.module === "Upsample") {
-    rows.push(["输出通道", `c_out = c_in = ${layer.channels}`]);
+    rows.push([t("yaml.outputChannels"), `c_out = c_in = ${layer.channels}`]);
   } else if (layer.module === "Detect") {
     const nc = currentNc();
     const regMax = currentRegMax();
-    rows.push(["输出维度", `no = nc + 4 × reg_max = ${nc} + 4 × ${regMax} = ${nc + 4 * regMax}`]);
+    rows.push([t("yaml.outputDim"), `no = nc + 4 × reg_max = ${nc} + 4 × ${regMax} = ${nc + 4 * regMax}`]);
   }
 
   if (layer.repeat > 1) {
-    rows.push(["重复次数", `repeat_actual = max(round(${layer.repeat} × depth ${model.depth}), 1) = ${layer.repeats}`]);
+    rows.push([t("yaml.repeats"), `repeat_actual = max(round(${layer.repeat} × depth ${model.depth}), 1) = ${layer.repeats}`]);
   } else {
-    rows.push(["重复次数", "repeat=1 时不做 depth 放缩。"]);
+    rows.push([t("yaml.repeats"), t("yaml.noDepthScale")]);
   }
 
   if (layer.module === "Conv") {
@@ -1667,8 +1831,8 @@ function renderYamlMath(layers, layer) {
     const output = parseShape(layer.outShape);
     if (input && output) {
       rows.push([
-        "空间尺寸",
-        `H_out = floor((${input.h} + 2×${p.p} - ${p.k}) / ${p.s}) + 1 = ${convOutSize(input.h, p)}，所以 ${input.h}×${input.w} → ${output.h}×${output.w}`,
+        t("yaml.spatial"),
+        t("yaml.spatialFormula", { h: input.h, p: p.p, k: p.k, s: p.s, out: convOutSize(input.h, p), ih: input.h, iw: input.w, oh: output.h, ow: output.w }),
       ]);
     }
   }
@@ -1691,8 +1855,8 @@ function renderYamlMath(layers, layer) {
 
 function renderScaleTable() {
   return `
-    <div class="scale-table" aria-label="模型缩放规则">
-      <div class="scale-row scale-head"><span>model</span><span>depth</span><span>width</span><span>max ch</span></div>
+    <div class="scale-table" aria-label="${escapeHtml(t("tables.scaleAria"))}">
+      <div class="scale-row scale-head"><span>${escapeHtml(t("tables.model"))}</span><span>${escapeHtml(t("tables.depth"))}</span><span>${escapeHtml(t("tables.width"))}</span><span>${escapeHtml(t("tables.maxChannels"))}</span></div>
       ${Object.entries(currentScales())
         .map(
           ([key, model]) => `
@@ -1715,8 +1879,8 @@ function renderModelComparison(layer) {
     return { key, cOut, repeat: candidate.repeats, hidden, branch };
   });
   return `
-    <div class="compare-table" aria-label="不同模型大小下当前层变化">
-      <div class="compare-row compare-head"><span>model</span><span>c_out</span><span>repeat</span><span>hidden/branch</span></div>
+    <div class="compare-table" aria-label="${escapeHtml(t("tables.modelCompareAria"))}">
+      <div class="compare-row compare-head"><span>${escapeHtml(t("tables.model"))}</span><span>c_out</span><span>repeat</span><span>${escapeHtml(t("tables.hiddenBranch"))}</span></div>
       ${rows
         .map(
           (row) => `
@@ -1736,7 +1900,7 @@ function renderModelComparison(layer) {
 function renderGlossary() {
   return `
     <div class="glossary-list">
-      ${PARAM_GLOSSARY.map(([term, desc]) => `<div class="term"><strong>${escapeHtml(term)}</strong><span>${escapeHtml(desc)}</span></div>`).join("")}
+      ${PARAM_GLOSSARY.map(([term, desc]) => `<div class="term"><strong>${escapeHtml(pickLang(term))}</strong><span>${escapeHtml(pickLang(desc))}</span></div>`).join("")}
     </div>
   `;
 }
@@ -1756,9 +1920,9 @@ function renderDiagram() {
   applyTransform();
 
   const title = svgEl("title", { id: "diagramTitle" });
-  title.textContent = `${currentVersion().fullName} 网络结构动态图`;
+  title.textContent = t("diagram.title", { version: currentVersion().fullName });
   const desc = svgEl("desc", { id: "diagramDesc" });
-  desc.textContent = `展示 ${currentVersion().fullName} 从输入、Backbone、Head 到 P3/P4/P5 Detect 的链路。点击模块可在主图原位展开结构，并打开参数抽屉。`;
+  desc.textContent = t("diagram.desc", { version: currentVersion().fullName });
   diagram.append(title, desc);
 
   addDefs(diagram);
@@ -1808,7 +1972,7 @@ function renderDetailBreadcrumb(top) {
     if (item.kind === "layer") {
       label = `Layer ${item.id} · ${item.layer.module}`;
     } else {
-      label = item.sub.title;
+      label = pickLang(item.sub.title);
     }
     const isLast = index === state.detailStack.length - 1;
     return `<button type="button" class="detail-crumb${isLast ? " is-current" : ""}" data-jump="${index}">
@@ -1822,7 +1986,7 @@ function renderDetailBreadcrumb(top) {
   if (top.kind === "layer") {
     title = `Layer ${top.id}: ${top.layer.module}`;
   } else {
-    title = top.sub.title;
+    title = pickLang(top.sub.title);
   }
   detailTitle.textContent = title;
 
@@ -1839,30 +2003,30 @@ function renderDetailBreadcrumb(top) {
 function renderLayerDetailBody(layer) {
   const layers = resolveLayers(state.modelKey);
   detailBody.innerHTML = `
-    <p class="detail-summary">${escapeHtml(getModuleDetails(layer.module) || "暂无说明")}</p>
+    <p class="detail-summary">${escapeHtml(pickLang(getModuleDetails(layer.module) || t("detail.noDescription")))}</p>
     ${renderKeyGrid(layer)}
     <section class="detail-section">
-      <h3>Shape 约定</h3>
+      <h3>${escapeHtml(t("detail.shape"))}</h3>
       ${renderShapeConvention(layer)}
     </section>
     <section class="detail-section">
-      <h3>输入 / 输出通道</h3>
+      <h3>${escapeHtml(t("detail.channels"))}</h3>
       ${renderChannelExplanation(layers, layer)}
     </section>
     <section class="detail-section">
-      <h3>本层 YAML 计算</h3>
+      <h3>${escapeHtml(t("detail.yamlMath"))}</h3>
       <pre class="code-block"><code>${escapeHtml(yamlArgs(layer))}</code></pre>
       ${renderYamlMath(layers, layer)}
-      <p class="note">通用公式与缩放规则表已抽到「📚 知识库」中，点击顶部工具栏的按钮可随时查看。</p>
+      <p class="note">${escapeHtml(t("detail.formulasNote"))}</p>
     </section>
     <section class="detail-section">
-      <h3>n/s/m/l/x 对比</h3>
+      <h3>${escapeHtml(t("detail.comparison"))}</h3>
       ${renderModelComparison(layer)}
     </section>
     <section class="detail-section">
-      <h3>模块内部结构</h3>
+      <h3>${escapeHtml(t("detail.internals"))}</h3>
       ${renderModuleFlow(layers, layer)}
-      <p class="note">点击展开图或上方流程中的小卡片，可查看该算子的简介与参数（在抽屉中嵌套展开）。</p>
+      <p class="note">${escapeHtml(t("detail.internalsNote"))}</p>
     </section>
   `;
 }
@@ -1879,10 +2043,10 @@ function renderSubmoduleDetailBody(item) {
   const inner = getUnitInner(item.sub.infoKey) || [];
 
   // 简介一句话
-  const summary = info.what || "暂无简介";
+  const summary = pickLang(info.what || t("detail.noSummary"));
 
   // 参数列表（从 info.params 字符串里拆出来逐项展示）
-  const paramLines = (info.params || "")
+  const paramLines = String(pickLang(info.params || ""))
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -1891,13 +2055,13 @@ function renderSubmoduleDetailBody(item) {
     <div class="sub-detail">
       <div class="sub-detail-head">
         <span class="sub-detail-kind kind-${item.sub.kind || "default"}">${escapeHtml(item.sub.kind || "unit")}</span>
-        <strong>${escapeHtml(item.sub.title)}</strong>
+        <strong>${escapeHtml(pickLang(item.sub.title))}</strong>
       </div>
       <p class="sub-detail-summary">${escapeHtml(summary)}</p>
 
       ${paramLines.length > 0 ? `
         <div class="sub-detail-section">
-          <h4>参数</h4>
+          <h4>${escapeHtml(t("detail.params"))}</h4>
           <div class="sub-detail-params">
             ${paramLines.map((p) => `<code>${escapeHtml(p)}</code>`).join("")}
           </div>
@@ -1906,22 +2070,22 @@ function renderSubmoduleDetailBody(item) {
 
       ${layer ? `
         <div class="sub-detail-section">
-          <h4>所属层</h4>
+          <h4>${escapeHtml(t("detail.ownerLayer"))}</h4>
           <p class="sub-detail-meta">Layer ${layer.id} · ${escapeHtml(layer.module)} · ${escapeHtml(layer.stage)}</p>
         </div>
       ` : ""}
 
       ${inner.length > 0 ? `
         <div class="sub-detail-section">
-          <h4>内部结构（点击查看）</h4>
+          <h4>${escapeHtml(t("detail.innerClickable"))}</h4>
           <div class="sub-detail-inner">
             ${inner.map((step, i) => `
-              <button type="button" class="sub-detail-step flow-step ${step.kind}" data-info-key="${escapeHtml(step.infoKey)}" data-title="${escapeHtml(step.title)}" data-kind="${escapeHtml(step.kind)}">
+              <button type="button" class="sub-detail-step flow-step ${step.kind}" data-info-key="${escapeHtml(step.infoKey)}" data-title="${escapeHtml(step.title)}" data-kind="${escapeHtml(step.kind)}" data-inner-index="${i}">
                 <div class="flow-title">
                   <span>${i + 1}</span>
-                  <strong>${escapeHtml(step.title)}</strong>
+                  <strong>${escapeHtml(pickLang(step.title))}</strong>
                 </div>
-                <ul>${step.lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>
+                <ul>${pickLang(step.lines).map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>
               </button>
               ${i < inner.length - 1 ? '<div class="flow-arrow">↓</div>' : ""}
             `).join("")}
@@ -1931,7 +2095,7 @@ function renderSubmoduleDetailBody(item) {
       ` : ""}
 
       ${state.detailStack.length > 1 ? `
-        <button type="button" class="sub-detail-back">← 返回上一级</button>
+        <button type="button" class="sub-detail-back">${escapeHtml(t("detail.back"))}</button>
       ` : ""}
     </div>
   `;
@@ -1946,7 +2110,7 @@ function renderSubmoduleDetailBody(item) {
       const innerInfo = getUnitInfo(infoKey);
       if (!innerInfo) return;
       // 取出该 inner 步骤的 lines
-      const innerStep = (getUnitInner(item.sub.infoKey) || []).find((s) => s.infoKey === infoKey && s.title === title);
+      const innerStep = (getUnitInner(item.sub.infoKey) || [])[Number(btn.dataset.innerIndex)] || (getUnitInner(item.sub.infoKey) || []).find((s) => s.infoKey === infoKey && s.title === title);
       pushDetail({
         kind: "submodule",
         layerId: item.layerId,
@@ -2267,84 +2431,84 @@ function renderReferenceModal() {
     : "Conv / C3k2 / SPPF / C2PSA / Upsample / Concat / Detect";
   body.innerHTML = `
     <section class="ref-section">
-      <h3>YAML 行格式</h3>
-      <p class="ref-intro">每一层在 ${yamlName} 中以一行 <code>[from, repeat, module, args]</code> 表示。例如：</p>
+      <h3>${escapeHtml(t("reference.yamlFormat"))}</h3>
+      <p class="ref-intro">${escapeHtml(t("reference.yamlIntro", { yamlName })).replace("[from, repeat, module, args]", "<code>[from, repeat, module, args]</code>")}</p>
       <pre class="code-block"><code>[[-1, 1, Conv, [64, 3, 2]]  # Layer 0</code></pre>
       <ul class="ref-list">
-        <li><strong>from</strong>：输入来源。<code>-1</code> 表示上一层，<code>[−1, 6]</code> 表示同时取上一层和 Layer 6（用于 Concat）。</li>
-        <li><strong>repeat</strong>：YAML 中声明的重复次数。实际堆叠数 = <code>max(round(repeat × depth), 1)</code>。</li>
-        <li><strong>module</strong>：模块类名，如 ${moduleExamples}。</li>
-        <li><strong>args</strong>：模块构造参数。第一个通常是输出通道数（base channels）。</li>
+        <li><strong>from</strong>: ${escapeHtml(t("reference.fromDesc")).replaceAll("-1", "<code>-1</code>").replaceAll("[−1, 6]", "<code>[−1, 6]</code>")}</li>
+        <li><strong>repeat</strong>: ${escapeHtml(t("reference.repeatDesc")).replace("max(round(repeat × depth), 1)", "<code>max(round(repeat × depth), 1)</code>")}</li>
+        <li><strong>module</strong>: ${escapeHtml(t("reference.moduleDesc", { examples: moduleExamples }))}</li>
+        <li><strong>args</strong>: ${escapeHtml(t("reference.argsDesc"))}</li>
       </ul>
     </section>
 
     <section class="ref-section">
-      <h3>当前版本特性</h3>
+      <h3>${escapeHtml(t("reference.versionFeatures"))}</h3>
       <div class="formula-panel">
         <div class="formula-row">
-          <span>版本</span>
+          <span>${escapeHtml(t("reference.version"))}</span>
           <code>${v.fullName} (${v.year})</code>
         </div>
         <div class="formula-row">
           <span>reg_max</span>
-          <code>${v.regMax}${v.regMax === 1 ? " (DFL 退化为直接回归)" : " (DFL 离散分布)"}</code>
+          <code>${v.regMax}${v.regMax === 1 ? (state.lang === "en" ? " (DFL direct regression)" : " (DFL 退化为直接回归)") : (state.lang === "en" ? " (DFL discrete distribution)" : " (DFL 离散分布)")}</code>
         </div>
         <div class="formula-row">
           <span>end2end</span>
-          <code>${v.end2end ? "True (one2many + one2one, 推理无需 NMS)" : "False (传统 NMS 流程)"}</code>
+          <code>${v.end2end ? (state.lang === "en" ? "True (one2many + one2one, NMS-free inference)" : "True (one2many + one2one, 推理无需 NMS)") : (state.lang === "en" ? "False (traditional NMS path)" : "False (传统 NMS 流程)")}</code>
         </div>
         <div class="formula-row">
           <span>Detect head</span>
-          <code>${v.legacy ? "legacy=True (纯 Conv cv2/cv3)" : "legacy=False (DWConv+Conv cv3)"}</code>
+          <code>${v.legacy ? (state.lang === "en" ? "legacy=True (pure Conv cv2/cv3)" : "legacy=True (纯 Conv cv2/cv3)") : "legacy=False (DWConv+Conv cv3)"}</code>
         </div>
         <div class="formula-row">
-          <span>YAML 源文件</span>
+          <span>${escapeHtml(t("reference.yamlSource"))}</span>
           <code><a href="${v.yamlUrl}" target="_blank" rel="noreferrer">${yamlName}</a></code>
         </div>
       </div>
     </section>
 
     <section class="ref-section">
-      <h3>通用计算公式</h3>
+      <h3>${escapeHtml(t("reference.formulas"))}</h3>
       <div class="formula-panel">
         <div class="formula-row">
-          <span>输出通道</span>
+          <span>${escapeHtml(t("reference.outputChannels"))}</span>
           <code>c_out = make_divisible(min(base, max_channels) × width, 8)</code>
         </div>
         <div class="formula-row">
-          <span>实际重复</span>
+          <span>${escapeHtml(t("reference.actualRepeat"))}</span>
           <code>repeat_actual = max(round(repeat × depth), 1)</code>
         </div>
         <div class="formula-row">
-          <span>Conv 空间尺寸</span>
+          <span>${escapeHtml(t("reference.convSpatial"))}</span>
           <code>H_out = floor((H_in + 2·p − k) / s) + 1</code>
         </div>
         <div class="formula-row">
-          <span>Detect 输出维度</span>
+          <span>${escapeHtml(t("reference.detectOutputDim"))}</span>
           <code>no = nc + 4 × reg_max = ${v.nc} + 4 × ${v.regMax} = ${v.nc + 4 * v.regMax}</code>
         </div>
         <div class="formula-row">
           <span>make_divisible</span>
-          <code>make_divisible(v, d=8) = ceil(v / d) × d  # 对齐到 8 的倍数</code>
+          <code>make_divisible(v, d=8) = ceil(v / d) × d  # ${state.lang === "en" ? "align to multiples of 8" : "对齐到 8 的倍数"}</code>
         </div>
       </div>
-      <p class="note">这些公式对所有层都适用，具体数值会因当前层的 base/repeat 与所选模型的 depth/width/max_channels 而不同。每层点击后右侧抽屉会展示带具体数值的计算过程。</p>
+      <p class="note">${escapeHtml(t("reference.formulasNote"))}</p>
     </section>
 
     <section class="ref-section">
-      <h3>${v.name} n / s / m / l / x 缩放规则</h3>
+      <h3>${escapeHtml(t("reference.scaleRules", { version: v.name }))}</h3>
       ${renderScaleTable()}
-      <p class="note">depth 控制 Bottleneck / C3k / PSABlock 等子块的重复次数；width 控制每层通道数；max_channels 是通道上限。同一个 C3k2 层在 YOLO11/26 的 m/l/x 规模下，内部子块类型也可能不同：n/s 用 Bottleneck，m/l/x 用 C3k。</p>
+      <p class="note">${escapeHtml(t("reference.scaleNote"))}</p>
     </section>
 
     <section class="ref-section">
-      <h3>参数词汇表</h3>
+      <h3>${escapeHtml(t("reference.glossary"))}</h3>
       ${renderGlossary()}
     </section>
 
     <section class="ref-section">
-      <h3>Shape 约定</h3>
-      <p class="note">主结构图统一使用 HWC：<code>height × width × channel</code>，便于从图像尺度理解网络。模块展开中的底层算子使用 PyTorch NCHW：<code>N × channel × height × width</code>，其中 <strong>N</strong> 表示 batch 维度（推理时 N=1，训练时 N 由 DataLoader 决定，是动态的）。例如 <code>80×80×128</code> 对应 <code>N×128×80×80</code>。</p>
+      <h3>${escapeHtml(t("reference.shapeConvention"))}</h3>
+      <p class="note">${escapeHtml(t("shape.reference"))}</p>
     </section>
   `;
 }
@@ -2404,37 +2568,37 @@ function renderCompareModal() {
 
   body.innerHTML = `
     <section class="ref-section">
-      <h3>演进时间线</h3>
+      <h3>${escapeHtml(t("compare.timeline"))}</h3>
       <div class="compare-timeline">
-        ${cmp.timeline.map((t) => `
-          <article class="timeline-item ${t.version === state.versionKey ? "is-current" : ""}">
+        ${cmp.timeline.map((item) => `
+          <article class="timeline-item ${item.version === state.versionKey ? "is-current" : ""}">
             <div class="timeline-head">
-              <span class="timeline-version">${VERSIONS[t.version].name}</span>
-              <span class="timeline-year">${t.year}</span>
+              <span class="timeline-version">${VERSIONS[item.version].name}</span>
+              <span class="timeline-year">${item.year}</span>
             </div>
-            <h4>${t.headline}</h4>
-            <p class="timeline-focus">重点：${t.focus}</p>
-            <p class="timeline-highlight">${escapeHtml(t.highlight)}</p>
+            <h4>${item.headline}</h4>
+            <p class="timeline-focus">${escapeHtml(t("compare.focus", { text: pickLang(item.focus) }))}</p>
+            <p class="timeline-highlight">${escapeHtml(pickLang(item.highlight))}</p>
           </article>
         `).join("")}
       </div>
     </section>
 
     <section class="ref-section">
-      <h3>关键差异矩阵</h3>
+      <h3>${escapeHtml(t("compare.matrix"))}</h3>
       <div class="compare-matrix-wrap">
         <table class="compare-matrix">
           <thead>
             <tr>
-              <th>维度</th>
+              <th>${escapeHtml(t("compare.dimension"))}</th>
               ${versions.map((v) => `<th class="${v.key === state.versionKey ? "is-current" : ""}">${v.name}</th>`).join("")}
             </tr>
           </thead>
           <tbody>
             ${cmp.matrix.map((row) => `
               <tr>
-                <td class="matrix-dim">${escapeHtml(row[0])}</td>
-                ${row.slice(1).map((cell, i) => `<td class="${versionKeys[i] === state.versionKey ? "is-current" : ""}">${escapeHtml(String(cell))}</td>`).join("")}
+                <td class="matrix-dim">${escapeHtml(pickLang(row[0]))}</td>
+                ${row.slice(1).map((cell, i) => `<td class="${versionKeys[i] === state.versionKey ? "is-current" : ""}">${escapeHtml(pickLang(String(cell)))}</td>`).join("")}
               </tr>
             `).join("")}
           </tbody>
@@ -2443,18 +2607,14 @@ function renderCompareModal() {
     </section>
 
     <section class="ref-section">
-      <h3>关键洞察</h3>
+      <h3>${escapeHtml(t("compare.takeaways"))}</h3>
       <ul class="ref-list">
-        <li><strong>Backbone 演进</strong>：YOLOv5 用 <code>C3</code> + 大核 <code>Conv k=6</code> 下采样；v8 改用 <code>C2f</code>（梯度流更短）；v11 引入 <code>C3k2</code>（可选 C3k 子块）+ <code>C2PSA</code> 注意力；v26 沿用 v11 backbone 但 SPPF 加 <code>shortcut=True</code> 残差。</li>
-        <li><strong>Head 演进</strong>：v5 head 用 <code>C3 (shortcut=False)</code>；v8 改 <code>C2f</code>；v11 用 <code>C3k2 (c3k=False)</code>；v26 全部改为 <code>C3k2 (c3k=True)</code>，精度更高但计算更重，P5 large 还额外启用 <code>e=0.5 + shortcut=True</code>。</li>
-        <li><strong>Detect 演进</strong>：v5/v8 用 <code>legacy=True</code> 纯 Conv 头；v11 改 <code>legacy=False</code> 用 DWConv+Conv 降参数；v26 关键突破：<code>reg_max=1</code>（DFL 退化为直接回归）+ <code>end2end=True</code>（推理无需 NMS）。</li>
-        <li><strong>规模缩放</strong>：v5/v8 沿用 <code>0.33/0.50/0.67/1.0/1.33</code> 的 depth 节奏；v11/v26 改为 <code>0.5/0.5/0.5/1.0/1.0</code>，n/s/m 共享 depth=0.5 让小模型也有足够深度。v11/v26 的 max_channels 在 m/l/x 截断到 512。</li>
-        <li><strong>参数量</strong>：v5n 2.6M → v8n 3.2M（精度提升但变重）→ v11n 2.6M（C3k2 + DWConv 让参数回落）→ v26n 2.6M（保持参数同时 end2end + reg_max=1 提升 AP）。</li>
+        ${pickLang(i18nEntry("compare.takeawaysHtml")).map((item) => `<li>${item}</li>`).join("")}
       </ul>
     </section>
 
     <section class="ref-section">
-      <h3>YAML 源文件</h3>
+      <h3>${escapeHtml(t("compare.yamlSources"))}</h3>
       <ul class="ref-list">
         ${versions.map((v) => `<li><strong>${v.name}</strong> (${v.year})：<a href="${v.yamlUrl}" target="_blank" rel="noreferrer">${v.yamlUrl.split("/").pop()}</a></li>`).join("")}
       </ul>
@@ -2527,11 +2687,15 @@ function bindVersionSwitch() {
 }
 
 function render() {
+  renderStaticText();
+  renderLanguageSwitch();
   renderVersionSwitch();
   renderModelSwitch();
   renderSummary();
   renderDiagram();
   renderDetail();
+  if (referenceModal()?.classList.contains("is-open")) renderReferenceModal();
+  if (compareModal()?.classList.contains("is-open")) renderCompareModal();
 }
 
 bindZoom();
