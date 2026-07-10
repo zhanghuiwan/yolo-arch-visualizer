@@ -7,7 +7,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 :root {
@@ -43,9 +43,15 @@ body {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
+}
+
+.page-frame {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
 }
 
 button,
@@ -255,6 +261,10 @@ input:focus-visible,
 }
 
 .app-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   padding: 12px 28px 18px;
 }
 
@@ -301,9 +311,11 @@ input:focus-visible,
 
 .workspace {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .diagram-panel,
@@ -314,6 +326,9 @@ input:focus-visible,
 }
 
 .diagram-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
@@ -394,8 +409,8 @@ input:focus-visible,
 
 .diagram-scroll {
   position: relative;
-  /* 固定高度（不被内容撑大），让 transform 后的 SVG 可以超出容器边界 */
-  height: min(76vh, 900px);
+  flex: 1 1 auto;
+  min-height: 560px;
   overflow: hidden;
   background:
     linear-gradient(90deg, oklch(0.948 0.006 220 / 0.62) 1px, transparent 1px),
@@ -414,9 +429,12 @@ input:focus-visible,
 
 #diagram {
   display: block;
-  /* 不再 min-width:100%，让 SVG 按自身 width 属性渲染 */
   transform-origin: 0 0;
-  will-change: transform;
+}
+
+#diagram text {
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 .node-hit {
@@ -1093,10 +1111,13 @@ input:focus-visible,
 
 .sources {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 0 28px 24px;
+  padding: 8px 28px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
   color: var(--muted);
   font-size: 0.9rem;
 }
@@ -1156,6 +1177,7 @@ input:focus-visible,
   }
 
   .app-shell {
+    flex: initial;
     padding: 10px 16px 16px;
   }
 
@@ -1197,6 +1219,7 @@ input:focus-visible,
   }
 
   .diagram-scroll {
+    flex: initial;
     height: min(58vh, 520px);
     min-height: 430px;
   }

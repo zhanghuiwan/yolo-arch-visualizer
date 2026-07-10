@@ -1913,10 +1913,8 @@ function renderDiagram() {
   zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
   diagram.innerHTML = "";
   diagram.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
-  // SVG 自身保持原始尺寸（不乘 zoom）；缩放由 transform 处理
   diagram.setAttribute("width", canvasWidth);
   diagram.setAttribute("height", canvasHeight);
-  // 应用 transform（pan + zoom）
   applyTransform();
 
   const title = svgEl("title", { id: "diagramTitle" });
@@ -1933,12 +1931,16 @@ function renderDiagram() {
 
 /**
  * 将当前 panX/panY/zoom 应用到 #diagram 元素。
- * 使用 transform 而非 width/height 缩放，避免容器尺寸被内容撑大导致无滚动空间。
- * panX/panY 为屏幕像素坐标（已包含 zoom 缩放），transform-origin 固定在 (0,0)。
+ * 缩放通过 SVG width/height 完成，让文字保持矢量重绘；transform 只负责整数像素平移。
+ * panX/panY 为屏幕像素坐标，transform-origin 固定在 (0,0)。
  */
 function applyTransform() {
+  const scaledWidth = Math.max(1, Math.round(currentCanvasWidth * state.zoom));
+  const scaledHeight = Math.max(1, Math.round(currentCanvasHeight * state.zoom));
+  diagram.setAttribute("width", scaledWidth);
+  diagram.setAttribute("height", scaledHeight);
   diagram.style.transformOrigin = "0 0";
-  diagram.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+  diagram.style.transform = `translate(${Math.round(state.panX)}px, ${Math.round(state.panY)}px)`;
 }
 
 function renderDetail() {

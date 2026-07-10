@@ -16,7 +16,7 @@ export default function Home() {
 
   return (
     <>
-      <div ref={containerRef}>
+      <div ref={containerRef} className="page-frame">
         <header className="topbar">
           <div className="title-block">
             <p className="source-label" data-i18n="shell.kicker">Ultralytics YOLO · 多版本架构对比 · Detect P3/P4/P5</p>
@@ -123,11 +123,11 @@ export default function Home() {
       </div>
 
       <Script
-        src={`${assetBase}/yolo11-arch/versions.js?v=20260707a`}
+        src={`${assetBase}/yolo11-arch/versions.js?v=20260710a`}
         strategy="afterInteractive"
       />
       <Script
-        src={`${assetBase}/yolo11-arch/app.js?v=20260707a`}
+        src={`${assetBase}/yolo11-arch/app.js?v=20260710a`}
         strategy="afterInteractive"
       />
     </>
