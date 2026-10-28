@@ -180,6 +180,19 @@ let currentCanvasWidth = SVG_SIZE.width;
 let currentCanvasHeight = SVG_SIZE.height;
 let panState = null;
 let suppressCanvasClick = false;
+let detailReturnFocusKey = null;
+
+function focusKeyWithin(container) {
+  const active = document.activeElement;
+  return container.contains(active) ? active.dataset.focusKey || null : null;
+}
+
+function restoreFocus(key, fallback = diagramScroll) {
+  if (!key) return;
+  const target = document.querySelector(`[data-focus-key="${CSS.escape(key)}"]`);
+  const next = target && !target.closest('[inert], [aria-hidden="true"]') ? target : fallback;
+  next?.focus({ preventScroll: true });
+}
 
 const modelSwitch = document.querySelector("#modelSwitch");
 const languageSwitch = document.querySelector("#languageSwitch");
@@ -588,6 +601,7 @@ function setLanguage(lang) {
 
 function renderLanguageSwitch() {
   if (!languageSwitch) return;
+  const focusKey = focusKeyWithin(languageSwitch);
   languageSwitch.innerHTML = "";
   [
     ["zh", t("language.zh"), t("language.zhAria")],
@@ -596,6 +610,7 @@ function renderLanguageSwitch() {
     const button = document.createElement("button");
     button.className = `language-button${lang === state.lang ? " active" : ""}`;
     button.type = "button";
+    button.dataset.focusKey = `language-${lang}`;
     button.textContent = label;
     button.setAttribute("aria-label", aria);
     button.setAttribute("aria-pressed", String(lang === state.lang));
@@ -605,9 +620,11 @@ function renderLanguageSwitch() {
     });
     languageSwitch.appendChild(button);
   });
+  restoreFocus(focusKey);
 }
 
 function renderModelSwitch() {
+  const focusKey = focusKeyWithin(modelSwitch);
   modelSwitch.innerHTML = "";
   const scales = currentScales();
   Object.entries(scales).forEach(([key, model]) => {
@@ -615,6 +632,8 @@ function renderModelSwitch() {
     button.className = `model-button${key === state.modelKey ? " active" : ""}`;
     button.type = "button";
     button.textContent = key;
+    button.dataset.focusKey = `model-${key}`;
+    button.setAttribute("aria-pressed", String(key === state.modelKey));
     button.title = `${currentVersion().name}${key} · ${model.params} params · ${model.gflops} GFLOPs`;
     button.setAttribute("aria-label", state.lang === "en" ? `Choose ${currentVersion().name}${key}` : `选择 ${currentVersion().name}${key}`);
     button.addEventListener("click", () => {
@@ -628,17 +647,21 @@ function renderModelSwitch() {
     });
     modelSwitch.appendChild(button);
   });
+  restoreFocus(focusKey);
 }
 
 function renderVersionSwitch() {
   const versionSwitch = document.querySelector("#versionSwitch");
   if (!versionSwitch) return;
+  const focusKey = focusKeyWithin(versionSwitch);
   versionSwitch.innerHTML = "";
   Object.values(VERSIONS).forEach((v) => {
     const button = document.createElement("button");
     button.className = `version-button${v.key === state.versionKey ? " active" : ""}`;
     button.type = "button";
     button.innerHTML = `<span class="version-label">${v.name}</span><span class="version-year">${v.year}</span>`;
+    button.dataset.focusKey = `version-${v.key}`;
+    button.setAttribute("aria-pressed", String(v.key === state.versionKey));
     button.title = `${v.fullName} · reg_max=${v.regMax}${v.end2end ? " · end2end" : ""}`;
     button.setAttribute("aria-label", state.lang === "en" ? `Switch to ${v.fullName}` : `切换到 ${v.fullName}`);
     button.addEventListener("click", () => {
@@ -652,6 +675,7 @@ function renderVersionSwitch() {
     });
     versionSwitch.appendChild(button);
   });
+  restoreFocus(focusKey);
 }
 
 function renderSummary() {
@@ -737,6 +761,7 @@ function drawBasicUnitCard(parent, x, y, width, height, title, color, lines, cli
   const displayLines = pickLang(lines);
   if (hasInfo) {
     card.classList.add("is-clickable");
+    card.dataset.focusKey = `unit-${clipId}`;
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", t("diagram.unitAria", { title: displayTitle }));
@@ -810,6 +835,7 @@ function drawExpandedModuleNode(svg, layer, layers) {
     "aria-label": t("diagram.collapseExpanded", { id: layer.id, module: layer.module }),
   });
   group.dataset.id = layer.id;
+  group.dataset.focusKey = `layer-${layer.id}`;
 
   const x = layer.x;
   const y = layer.y;
@@ -899,6 +925,7 @@ function drawLayerNode(svg, layer) {
     }),
   });
   group.dataset.id = layer.id;
+  group.dataset.focusKey = `layer-${layer.id}`;
 
   // 当 repeats > 1 时，先在右下方画 N-1 个偏移矩形，模拟"堆叠卡片"效果
   if (hasRepeatViz) {
@@ -1043,6 +1070,7 @@ function drawDetectNode(svg, detectLayer, target) {
     addText(group, target.shape, pseudo.x + pseudo.width - 16, pseudo.y + 50, { fill: COLORS.ink, "font-size": 14.4, "font-weight": 820, "text-anchor": "end" });
   }
 
+  group.dataset.focusKey = `detect-${target.source}`;
   group.addEventListener("click", (event) => {
     event.stopPropagation();
     selectLayer(detectLayer.id);
@@ -1906,6 +1934,7 @@ function renderGlossary() {
 }
 
 function renderDiagram() {
+  const focusKey = focusKeyWithin(diagram);
   const { layers, canvasWidth, canvasHeight } = layoutLayers(resolveLayers(state.modelKey));
   currentCanvasWidth = canvasWidth;
   currentCanvasHeight = canvasHeight;
@@ -1927,6 +1956,7 @@ function renderDiagram() {
   diagram.appendChild(svgEl("rect", { x: 0, y: 0, width: canvasWidth, height: canvasHeight, rx: 10, fill: COLORS.canvas, stroke: "oklch(0.858 0.018 160)", "stroke-width": 1.6 }));
   drawMainDiagram(diagram, layers, canvasHeight);
   updateActiveZoomPreset();
+  restoreFocus(focusKey);
 }
 
 /**
@@ -1944,6 +1974,13 @@ function applyTransform() {
 }
 
 function renderDetail() {
+  const hadFocus = detailPanel.contains(document.activeElement);
+  const wasOpen = detailPanel.classList.contains("is-open");
+  const focusKey = focusKeyWithin(detailPanel);
+  if (!wasOpen && state.detailOpen) {
+    detailReturnFocusKey = document.activeElement?.dataset.focusKey || `layer-${state.selectedId}`;
+  }
+  if (!state.detailOpen && hadFocus) restoreFocus(detailReturnFocusKey);
   // 如果栈为空（例如关闭抽屉后再次点击同层），根据 selectedId 重建栈
   if (state.detailStack.length === 0) {
     const fallbackLayer = resolveLayers(state.modelKey).find((l) => l.id === state.selectedId) || resolveLayers(state.modelKey)[2];
@@ -1957,6 +1994,7 @@ function renderDetail() {
   const shouldDockLeft = refLayer && (refLayer.module === "Detect" || refLayer.x > 620);
   detailPanel.classList.toggle("is-open", state.detailOpen);
   detailPanel.classList.toggle("is-left", shouldDockLeft);
+  detailPanel.inert = !state.detailOpen;
   detailPanel.setAttribute("aria-hidden", String(!state.detailOpen));
 
   // 顶部面包屑 + 标题
@@ -1965,6 +2003,10 @@ function renderDetail() {
     renderLayerDetailBody(top.layer);
   } else {
     renderSubmoduleDetailBody(top);
+  }
+  if (state.detailOpen && (hadFocus || (!wasOpen && window.matchMedia("(max-width: 760px)").matches))) {
+    if (focusKey && detailPanel.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`)) restoreFocus(focusKey);
+    else detailTitle.focus({ preventScroll: true });
   }
 }
 
@@ -1977,7 +2019,7 @@ function renderDetailBreadcrumb(top) {
       label = pickLang(item.sub.title);
     }
     const isLast = index === state.detailStack.length - 1;
-    return `<button type="button" class="detail-crumb${isLast ? " is-current" : ""}" data-jump="${index}">
+    return `<button type="button" class="detail-crumb${isLast ? " is-current" : ""}" data-jump="${index}" data-focus-key="detail-crumb-${index}">
       ${escapeHtml(label)}
     </button>`;
   });
@@ -2179,7 +2221,7 @@ function closeDetailDrawer() {
 }
 
 function clampZoom(value) {
-  return Math.min(2.2, Math.max(0.45, value));
+  return Math.min(2.2, Math.max(0.01, value));
 }
 
 /**
@@ -2245,7 +2287,7 @@ function updateActiveZoomPreset() {
 function fitDiagram() {
   const w = diagramScroll.clientWidth - 32;
   const h = diagramScroll.clientHeight - 32;
-  const nextZoom = Math.min(1.2, Math.max(0.45, Math.min(w / currentCanvasWidth, h / currentCanvasHeight)));
+  const nextZoom = Math.min(1.2, w / currentCanvasWidth, h / currentCanvasHeight);
   // 适屏：先重置 pan，再缩放，最后让画布居中显示在容器内
   state.zoom = clampZoom(nextZoom);
   const scaledW = currentCanvasWidth * state.zoom;
@@ -2286,6 +2328,7 @@ function bindZoom() {
     { passive: false },
   );
   document.addEventListener("keydown", (event) => {
+    if (event.target.closest?.('[role="dialog"]')) return;
     if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
     if (event.key === "0") { event.preventDefault(); updateZoom(0.7, true); }
     else if (event.key === "f" || event.key === "F") { event.preventDefault(); fitDiagram(); }
@@ -2369,6 +2412,8 @@ function bindDrawer() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (compareModal()?.classList.contains("is-open")) { closeCompareModal(); return; }
+      if (referenceModal()?.classList.contains("is-open")) { closeReferenceModal(); return; }
       // 优先级：先返回抽屉上一级，已在根级则关闭抽屉
       if (state.detailStack.length > 1) {
         popDetail();
@@ -2520,6 +2565,7 @@ function openReferenceModal(trigger = document.querySelector("#referenceTrigger"
   if (!modal) return;
   referenceReturnFocus = trigger || document.activeElement;
   renderReferenceModal();
+  modal.inert = false;
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
   modal.setAttribute("aria-modal", "true");
@@ -2530,12 +2576,13 @@ function closeReferenceModal({ restoreFocus = true } = {}) {
   const modal = referenceModal();
   if (!modal) return;
   const wasOpen = modal.classList.contains("is-open");
+  if (wasOpen && restoreFocus && referenceReturnFocus?.isConnected) {
+    referenceReturnFocus.focus({ preventScroll: true });
+  }
+  modal.inert = true;
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
   modal.removeAttribute("aria-modal");
-  if (wasOpen && restoreFocus && referenceReturnFocus) {
-    referenceReturnFocus.focus({ preventScroll: true });
-  }
 }
 
 function bindReferenceModal() {
@@ -2629,6 +2676,7 @@ function openCompareModal(trigger = document.querySelector("#compareTrigger")) {
   if (!modal) return;
   compareReturnFocus = trigger || document.activeElement;
   renderCompareModal();
+  modal.inert = false;
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
   modal.setAttribute("aria-modal", "true");
@@ -2639,12 +2687,13 @@ function closeCompareModal({ restoreFocus = true } = {}) {
   const modal = compareModal();
   if (!modal) return;
   const wasOpen = modal.classList.contains("is-open");
+  if (wasOpen && restoreFocus && compareReturnFocus?.isConnected) {
+    compareReturnFocus.focus({ preventScroll: true });
+  }
+  modal.inert = true;
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
   modal.removeAttribute("aria-modal");
-  if (wasOpen && restoreFocus && compareReturnFocus) {
-    compareReturnFocus.focus({ preventScroll: true });
-  }
 }
 
 function bindCompareModal() {
@@ -2670,6 +2719,7 @@ function bindVersionSwitch() {
   // 版本切换器在 renderVersionSwitch() 中绑定，这里无需额外事件
   // 但监听键盘 1/2/3/4 快速切换版本
   document.addEventListener("keydown", (event) => {
+    if (event.target.closest?.('[role="dialog"]')) return;
     if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
     const versionKeys = ["v5", "v8", "v11", "v26"];
     const num = parseInt(event.key, 10);

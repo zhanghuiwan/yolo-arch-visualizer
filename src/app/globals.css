@@ -472,6 +472,7 @@ input:focus-visible,
   max-height: calc(100vh - 216px);
   overflow: auto;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transform: translateX(calc(100% + 28px));
   transition:
@@ -487,6 +488,7 @@ input:focus-visible,
 
 .detail-panel.is-open {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
   transform: translateX(0);
 }
@@ -1201,6 +1203,8 @@ input:focus-visible,
   }
 
   .legend {
+    flex: 0 0 auto;
+    min-width: 0;
     flex-wrap: nowrap;
     gap: 12px;
     overflow-x: auto;
@@ -1499,12 +1503,14 @@ input:focus-visible,
   background: oklch(0.184 0.018 165 / 0.42);
   backdrop-filter: blur(4px);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity 180ms ease;
 }
 
 .reference-modal.is-open {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 

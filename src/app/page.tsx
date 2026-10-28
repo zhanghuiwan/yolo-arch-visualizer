@@ -47,7 +47,7 @@ export default function Home() {
                 <div className="toolbar-actions">
                   <div className="zoom-tools" aria-label="缩放画布" data-i18n-aria="zoom.toolsAria">
                     <button className="icon-button" id="zoomOut" type="button" title="缩小" aria-label="缩小" data-i18n-title="zoom.out" data-i18n-aria="zoom.out">−</button>
-                    <input id="zoomRange" type="range" min="45" max="220" defaultValue={70} aria-label="缩放比例" data-i18n-aria="zoom.rangeAria" />
+                    <input id="zoomRange" type="range" min="1" max="220" defaultValue={70} aria-label="缩放比例" data-i18n-aria="zoom.rangeAria" />
                     <button className="icon-button" id="zoomIn" type="button" title="放大" aria-label="放大" data-i18n-title="zoom.in" data-i18n-aria="zoom.in">+</button>
                     <div className="zoom-presets" id="zoomPresets" aria-label="缩放预设" data-i18n-aria="zoom.presetsAria">
                       <button className="preset-button" type="button" data-zoom="0.6">60%</button>
@@ -67,15 +67,15 @@ export default function Home() {
                 </div>
               </div>
               <div className="diagram-scroll" id="diagramScroll" tabIndex={0} aria-label="YOLO 架构画布 · 鼠标拖拽平移 · 滚轮缩放 · Shift+滚轮垂直平移 · 按 F 适屏 · 按 1/2/3/4 切换版本" data-i18n-aria="diagram.scrollAria">
-                <svg id="diagram" role="img" aria-labelledby="diagramTitle diagramDesc"></svg>
+                <svg id="diagram" role="group" aria-labelledby="diagramTitle diagramDesc"></svg>
               </div>
             </div>
 
-            <aside className="detail-panel" aria-live="polite">
+            <aside className="detail-panel" aria-live="polite" aria-hidden="true" inert={true}>
               <div className="detail-head">
                 <div className="detail-title-area">
                   <p className="panel-kicker" id="detailSection" data-i18n="detail.kicker">模块详情</p>
-                  <h2 id="detailTitle" data-i18n="detail.emptyTitle">点击图中的模块</h2>
+                  <h2 id="detailTitle" tabIndex={-1} data-i18n="detail.emptyTitle">点击图中的模块</h2>
                 </div>
                 <button className="detail-close" type="button" aria-label="关闭模块详情" title="关闭模块详情" data-i18n-aria="detail.closeAria" data-i18n-title="detail.closeAria">×</button>
               </div>
@@ -84,7 +84,7 @@ export default function Home() {
           </section>
         </main>
 
-        <div id="referenceModal" className="reference-modal" aria-hidden="true" role="dialog" aria-labelledby="referenceTitle">
+        <div id="referenceModal" className="reference-modal" aria-hidden="true" inert={true} role="dialog" aria-labelledby="referenceTitle">
           <div className="reference-modal-card">
             <div className="reference-modal-head">
               <div>
@@ -97,7 +97,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div id="compareModal" className="reference-modal" aria-hidden="true" role="dialog" aria-labelledby="compareTitle">
+        <div id="compareModal" className="reference-modal" aria-hidden="true" inert={true} role="dialog" aria-labelledby="compareTitle">
           <div className="reference-modal-card">
             <div className="reference-modal-head">
               <div>
@@ -123,11 +123,11 @@ export default function Home() {
       </div>
 
       <Script
-        src={`${assetBase}/yolo11-arch/versions.js?v=20260710a`}
+        src={`${assetBase}/yolo11-arch/versions.js?v=20261028a`}
         strategy="afterInteractive"
       />
       <Script
-        src={`${assetBase}/yolo11-arch/app.js?v=20260710a`}
+        src={`${assetBase}/yolo11-arch/app.js?v=20261028a`}
         strategy="afterInteractive"
       />
     </>
